@@ -169,8 +169,8 @@ function App() {
               <>
                 <h3>Waiting for the backend…</h3>
                 <p>
-                  Start it with <code>npm run back</code> in the project folder. This page
-                  connects by itself as soon as it is up.
+                  Start it with <code>npm run start:dev</code> in <code>Todoapp_Back</code>. This
+                  page connects by itself as soon as it is up.
                 </p>
                 <button className="btn small" onClick={loadData}>
                   Try now

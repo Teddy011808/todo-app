@@ -4,13 +4,12 @@ Backend for the React Todo app in `../Todoapp_Front`. All routes start with `/ap
 
 ## Run it
 
-From the project root: `npm run back`. Or from this folder:
-
 ```bash
-npm install
-npm run db:up        # starts PostgreSQL in Docker (docker-compose.yml, port 5433)
-npm run start:dev    # API on http://localhost:3000; pending migrations run on startup
+npm run start:dev    # API on http://localhost:3000
 ```
+
+Before it starts, `prestart:dev` runs `npm install` and `npm run db:up` (PostgreSQL in Docker via
+`docker-compose.yml`, port 5433). Pending migrations run when the API starts.
 
 Settings (port, database connection, optional `CORS_ORIGIN`) can be overridden in `.env`; see `.env.example`.
 Without a `.env`, the defaults match `docker-compose.yml`.
@@ -51,6 +50,7 @@ npm run typeorm -- migration:run -d src/data-source.ts
 ## Tests
 
 ```bash
+npm run db:up        # make sure PostgreSQL is running
 npm run test:e2e
 ```
 

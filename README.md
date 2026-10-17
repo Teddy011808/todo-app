@@ -9,14 +9,15 @@ A full-stack to-do app: a React frontend and a NestJS REST API backed by Postgre
 
 ## Run it
 
-You need **Node.js 20.12+** and **Docker Desktop** (running). Then, from this folder, in two terminals:
+You need **Node.js 20.12+** and **Docker Desktop** (running). Then, in two terminals:
 
 ```bash
-npm run front   # React app  -> http://localhost:5173
-npm run back    # API        -> http://localhost:3000/api
+cd Todoapp_Front && npm run dev          # React app -> http://localhost:5173
+cd Todoapp_Back  && npm run start:dev    # API       -> http://localhost:3000/api
 ```
 
-That's it. The commands can be run in either order. `npm run back` installs packages, starts PostgreSQL
-in Docker (port 5433), creates the tables, and starts the API. The page connects by itself once the API is up.
+That's it, in either order. Before starting, each command installs its packages automatically
+(npm `predev` / `prestart:dev` scripts). The backend also starts PostgreSQL in Docker (port 5433) and
+creates the tables. The page connects by itself once the API is up.
 
-Run the API tests with `npm test`.
+Run the API tests with `cd Todoapp_Back && npm run test:e2e`.
