@@ -1,0 +1,99 @@
+:root {
+  --bg: #f5f6fa;
+  --surface: #ffffff;
+  --surface-2: #f7f8fb;
+  --raised: #ffffff;
+  --text: #161827;
+  --text-2: #4a4e66;
+  --muted: #8a8ea6;
+  --border: #e7e9f0;
+  --border-strong: #d6d9e4;
+  --primary: #5b4ff5;
+  --primary-hover: #4b3fe2;
+  --primary-soft: #efeefe;
+  --primary-text: #4b3fe2;
+  --accent: #a855f7;
+  --danger: #e5484d;
+  --danger-soft: #fdecec;
+  --todo: #8a8ea6;
+  --todo-soft: #f0f1f6;
+  --progress: #d97706;
+  --progress-soft: #fef3e2;
+  --done: #16a34a;
+  --done-soft: #e6f6ec;
+  --star: #f5a524;
+  --float-bg: #1b1d29;
+  --shadow-sm: 0 1px 2px rgba(22, 24, 39, 0.06);
+  --shadow: 0 1px 3px rgba(22, 24, 39, 0.05), 0 6px 16px rgba(22, 24, 39, 0.04);
+  --shadow-lg: 0 16px 40px rgba(22, 24, 39, 0.22);
+  --radius: 16px;
+
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e0f15;
+    --surface: #171922;
+    --surface-2: #1d202b;
+    --raised: #2a2d3c;
+    --text: #ecedf3;
+    --text-2: #b6b9cb;
+    --muted: #7f8399;
+    --border: #262937;
+    --border-strong: #353949;
+    --primary: #7b71ff;
+    --primary-hover: #8d85ff;
+    --primary-soft: #25224a;
+    --primary-text: #a7a1ff;
+    --danger: #f2555a;
+    --danger-soft: #3a1c20;
+    --todo: #8a8ea6;
+    --todo-soft: #252837;
+    --progress: #f0a83a;
+    --progress-soft: #382912;
+    --done: #3fc677;
+    --done-soft: #142e1e;
+    --float-bg: #2a2d3c;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 6px 16px rgba(0, 0, 0, 0.2);
+    --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+input,
+select,
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.tsbuildinfo
+coverage/
+
+# Local settings and secrets: copy .env.example to .env
+.env
