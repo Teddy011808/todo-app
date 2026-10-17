@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -15,6 +16,9 @@ import { TodosModule } from './todos/todos.module.js';
         ...dbOptions(),
         autoLoadEntities: true,
         synchronize: false, // tables are created by migrations only
+        // Apply any new migrations on startup, so a fresh clone just works
+        migrations: [join(import.meta.dirname, 'migrations', '*.js')],
+        migrationsRun: true,
       }),
     }),
     // At most 120 requests per minute per client IP

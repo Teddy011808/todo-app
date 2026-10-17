@@ -9,9 +9,11 @@ export function setupApp(app: INestApplication) {
   // Standard security headers (nosniff, frameguard, HSTS, ...)
   app.use(helmet());
 
-  // React on :5173 and NestJS on :3000 are different origins
+  // React (Vite) and NestJS run on different ports, so the browser needs CORS.
+  // Without CORS_ORIGIN, any localhost port is allowed (Vite may pick 5174, ...).
   app.enableCors({
-    origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+    origin:
+      process.env.CORS_ORIGIN ?? /^http:\/\/(localhost|127\.0\.0\.1):\d+$/,
   });
 
   // Validate every request body against its DTO: bad input -> 400

@@ -40,6 +40,14 @@ function App() {
     loadData()
   }, [loadData])
 
+  // Backend not up yet (e.g. the frontend was started first)? Keep retrying
+  // every 2 seconds until the first load works.
+  useEffect(() => {
+    if (user || !loadError) return
+    const timer = setInterval(loadData, 2000)
+    return () => clearInterval(timer)
+  }, [user, loadError, loadData])
+
   // Run a save request; on failure show the error and reload the real data
   const save = useCallback(
     async (request) => {
@@ -155,14 +163,17 @@ function App() {
   if (!user) {
     return (
       <div className="app">
-        <main className="container">
+        <main className="container page">
           <div className="card empty">
             {loadError ? (
               <>
-                <h3>Can't reach the server</h3>
-                <p>{loadError}. Is the backend running? (cd Todoapp_Back &amp;&amp; npm run start:dev)</p>
+                <h3>Waiting for the backend…</h3>
+                <p>
+                  Start it with <code>npm run back</code> in the project folder. This page
+                  connects by itself as soon as it is up.
+                </p>
                 <button className="btn small" onClick={loadData}>
-                  Try again
+                  Try now
                 </button>
               </>
             ) : (

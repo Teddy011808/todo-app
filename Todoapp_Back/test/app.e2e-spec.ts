@@ -22,6 +22,17 @@ describe('Todo API (e2e)', () => {
   let server: App;
 
   beforeAll(async () => {
+    // Create the test database the first time
+    const admin = new DataSource({ ...dbOptions(), database: 'postgres' });
+    await admin.initialize();
+    const database = String(dbOptions().database);
+    const exists: unknown[] = await admin.query(
+      'SELECT 1 FROM pg_database WHERE datname = $1',
+      [database],
+    );
+    if (exists.length === 0) await admin.query(`CREATE DATABASE "${database}"`);
+    await admin.destroy();
+
     const ds = new DataSource({ ...dbOptions(), migrations });
     await ds.initialize();
     await ds.dropDatabase();

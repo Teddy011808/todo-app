@@ -4,22 +4,16 @@ Backend for the React Todo app in `../Todoapp_Front`. All routes start with `/ap
 
 ## Run it
 
+From the project root: `npm run back`. Or from this folder:
+
 ```bash
-# 1. Start Postgres (first time only; afterwards: docker start todo-db)
-docker run --name todo-db -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=todo -p 5432:5432 -d postgres:16
-
-# 2. Install and create the tables
 npm install
-npm run typeorm -- migration:run -d src/data-source.ts
-
-# 3. Start the API on http://localhost:3000
-npm run start:dev
+npm run db:up        # starts PostgreSQL in Docker (docker-compose.yml, port 5433)
+npm run start:dev    # API on http://localhost:3000; pending migrations run on startup
 ```
 
-Then start the frontend: `cd ../Todoapp_Front && npm run dev`, and open http://localhost:5173.
-
-Settings (port, CORS origin, database connection) live in `.env`. It is not committed to git:
-copy `.env.example` to `.env` on a new machine (`cp .env.example .env`) and edit the values.
+Settings (port, database connection, optional `CORS_ORIGIN`) can be overridden in `.env`; see `.env.example`.
+Without a `.env`, the defaults match `docker-compose.yml`.
 
 ## Endpoints
 
@@ -57,8 +51,7 @@ npm run typeorm -- migration:run -d src/data-source.ts
 ## Tests
 
 ```bash
-docker exec todo-db psql -U postgres -c "CREATE DATABASE todo_test;"   # first time only
 npm run test:e2e
 ```
 
-The e2e tests build `todo_test` from the migrations and never touch your real data.
+The e2e tests create a separate `todo_test` database, build it from the migrations, and never touch your real data.

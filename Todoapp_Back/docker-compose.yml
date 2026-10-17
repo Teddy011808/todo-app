@@ -1,0 +1,25 @@
+# PostgreSQL for the API. Started automatically by `npm run back` (or `npm run db:up`).
+# Values come from .env when it exists, otherwise the defaults after ":-".
+name: todo-app
+
+services:
+  db:
+    image: postgres:16
+    container_name: todo-app-db
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-todo}
+    ports:
+      # 5433 on your machine, so it never clashes with another Postgres on 5432
+      - '${DB_PORT:-5433}:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  pgdata:
