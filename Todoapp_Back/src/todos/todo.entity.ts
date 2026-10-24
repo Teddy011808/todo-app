@@ -3,8 +3,10 @@ import {
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
+  ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { User } from '../auth/user.entity.js';
 
 export const TODO_STATUSES = ['TODO', 'IN_PROGRESS', 'DONE'] as const;
 export type TodoStatus = (typeof TODO_STATUSES)[number];
@@ -30,6 +32,13 @@ export class Todo {
   // Bonus: drag-and-drop order (smallest first)
   @Column({ default: 0 })
   position: number;
+
+  // Every to-do has an owner; it comes from the token, never from the body
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  owner?: User;
+
+  @Column({ select: false })
+  ownerId: number;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;

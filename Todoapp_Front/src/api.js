@@ -17,12 +17,50 @@ function toApiChanges(changes) {
   return changes.status ? { ...changes, status: toApiStatus(changes.status) } : changes
 }
 
-async function request(path, method = 'GET', body) {
-  const response = await fetch(`${API_URL}${path}`, {
+// Access token (15 min) is kept in memory only, never in localStorage.
+// The refresh token (7 days) is an HttpOnly cookie that JavaScript cannot read;
+// the browser sends it to /api/auth/* and we trade it for a new access token.
+let accessToken = null
+let onUnauthorized = () => {}
+let refreshing = null
+
+function send(path, method, body) {
+  const headers = {}
+  if (body) headers['Content-Type'] = 'application/json'
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`
+  return fetch(`${API_URL}${path}`, {
     method,
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    headers,
     body: body ? JSON.stringify(body) : undefined,
+    credentials: 'include', // without this the browser never sends the cookie
   })
+}
+
+// Each refresh token works only once, so parallel callers must share one
+// refresh: a second one would look like a stolen token and log everyone out.
+function refreshAccessToken() {
+  refreshing ??= send('/auth/refresh', 'POST')
+    .then(async (response) => {
+      accessToken = response.ok ? (await response.json()).accessToken : null
+      return Boolean(accessToken)
+    })
+    .catch(() => false)
+    .finally(() => {
+      refreshing = null
+    })
+  return refreshing
+}
+
+async function request(path, method = 'GET', body) {
+  let response = await send(path, method, body)
+  // Access token expired: get a new one with the cookie and retry once
+  if (response.status === 401 && !path.startsWith('/auth/')) {
+    if (await refreshAccessToken()) {
+      response = await send(path, method, body)
+    } else {
+      onUnauthorized() // refresh failed too: back to the login page
+    }
+  }
   if (response.status === 204) return null // DELETE has no body
   const data = await response.json().catch(() => null)
   if (!response.ok) {
@@ -33,6 +71,22 @@ async function request(path, method = 'GET', body) {
 }
 
 export const api = {
+  // Auth: POST /api/auth/signup and /api/auth/login
+  signup: (email, password) => request('/auth/signup', 'POST', { email, password }),
+  login: async (email, password) => {
+    accessToken = (await request('/auth/login', 'POST', { email, password })).accessToken
+  },
+  // On page load: the refresh cookie brings back a fresh access token
+  restoreSession: refreshAccessToken,
+  // Revokes the refresh tokens on the server and clears the cookie
+  logout: async () => {
+    await request('/auth/logout', 'POST').catch(() => {})
+    accessToken = null
+  },
+  setOnUnauthorized: (handler) => {
+    onUnauthorized = handler
+  },
+
   // Todos: GET, POST, PATCH, DELETE /api/todos
   getTodos: async () => (await request('/todos')).map(fromApiTodo),
   createTodo: async (title, status) =>

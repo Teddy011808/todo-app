@@ -1,16 +1,35 @@
 import { join } from 'node:path';
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { LoggingExceptionFilter } from './common/logging-exception.filter.js';
+import Joi from 'joi';
+import { AuthModule } from './auth/auth.module.js';
+import { JwtAuthGuard } from './auth/jwt-auth.guard.js';
 import { dbOptions } from './database/db-options.js';
+import { LoggingExceptionFilter } from './common/logging-exception.filter.js';
 import { ProfileModule } from './profile/profile.module.js';
 import { TodosModule } from './todos/todos.module.js';
 
 @Module({
   imports: [
-    // Read the env at startup (not import time) so tests can point at todo_test
+    // Check settings at startup: a bad or missing value stops the app at boot
+    ConfigModule.forRoot({
+      isGlobal: true,
+      validationSchema: Joi.object({
+        PORT: Joi.number().port().default(3000),
+        CORS_ORIGIN: Joi.string().uri(),
+        // Defaults live in dbOptions(), shared with the migration CLI and tests
+        DB_HOST: Joi.string(),
+        DB_PORT: Joi.number().port(),
+        DB_USER: Joi.string(),
+        DB_PASSWORD: Joi.string(),
+        DB_NAME: Joi.string(),
+        JWT_SECRET: Joi.string().min(32).required(),
+      }),
+    }),
+    // ConfigModule loads and checks .env first, so this factory sees valid values
     TypeOrmModule.forRootAsync({
       useFactory: () => ({
         ...dbOptions(),
@@ -25,9 +44,12 @@ import { TodosModule } from './todos/todos.module.js';
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     TodosModule,
     ProfileModule,
+    AuthModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Secure by default: every route needs a token unless it is @Public()
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_FILTER, useClass: LoggingExceptionFilter },
   ],
 })
