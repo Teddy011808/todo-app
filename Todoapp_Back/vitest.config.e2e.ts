@@ -7,7 +7,10 @@ export default defineConfig({
     root: './',
     include: ['**/*.e2e-spec.ts'],
     // e2e tests use their own database so they never touch your real todos
-    env: { DB_NAME: 'todo_test' },
+    env: {
+      DB_NAME: 'todo_test',
+      JWT_SECRET: 'test-secret-at-least-32-characters-long',
+    },
     fileParallelism: false,
   },
 });
