@@ -1,11 +1,14 @@
+import { SchedulerRegistry } from '@nestjs/schedule';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
+import { of, throwError } from 'rxjs';
 import { DataSource } from 'typeorm';
 import { AppModule } from './../src/app.module.js';
 import { setupApp } from './../src/app.setup.js';
 import { dbOptions } from './../src/database/db-options.js';
+import { CleanupTask } from './../src/todos/cleanup.task.js';
 
 // Build the test database from the real migrations
 const migrations = Object.values(
@@ -21,6 +24,8 @@ describe('Todo API (e2e)', () => {
   let app: INestApplication<App>;
   let server: App;
   let token: string;
+  // Stands in for RabbitMQ, so these tests do not need a broker
+  const emailClient = { emit: vi.fn(() => of(undefined)) };
 
   // Every request is sent as the logged-in test user
   const api = () =>
@@ -58,15 +63,21 @@ describe('Todo API (e2e)', () => {
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider('EMAIL_SERVICE')
+      .useValue(emailClient)
+      .compile();
 
     app = moduleFixture.createNestApplication();
     setupApp(app);
     await app.init();
     await app
       .get(DataSource)
-      .query('TRUNCATE todos, profile, users, refresh_tokens RESTART IDENTITY');
+      .query(
+        'TRUNCATE todos, profile, users, refresh_tokens, activity RESTART IDENTITY',
+      );
     server = app.getHttpServer();
+    emailClient.emit.mockClear();
     token = await login('alice@test.dev');
   });
 
@@ -301,7 +312,10 @@ describe('Todo API (e2e)', () => {
 
     const moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider('EMAIL_SERVICE')
+      .useValue(emailClient)
+      .compile();
     app = moduleFixture.createNestApplication();
     setupApp(app);
     await app.init();
@@ -415,6 +429,101 @@ describe('Todo API (e2e)', () => {
       expect(res.body).toMatchObject({ starred: true, title: 'Important' });
       const starred = await api().get('/api/todos?starred=true').expect(200);
       expect(starred.body).toHaveLength(1);
+    });
+  });
+
+  describe('background work', () => {
+    // Listeners run after the response, so wait for the row to appear
+    const feed = async (length: number) =>
+      vi.waitFor(async () => {
+        const res = await api().get('/api/activity').expect(200);
+        expect(res.body).toHaveLength(length);
+        return (res.body as { message: string }[]).map((a) => a.message);
+      });
+
+    it('creating, updating and deleting todos fills GET /api/activity', async () => {
+      const { id } = await create('Buy milk');
+      await feed(1);
+      await api()
+        .patch(`/api/todos/${id}`)
+        .send({ status: 'DONE' })
+        .expect(200);
+      await feed(2);
+      await api().delete(`/api/todos/${id}`).expect(204);
+      expect(await feed(3)).toEqual([
+        'Deleted "Buy milk"',
+        'Updated "Buy milk"',
+        'Created "Buy milk"',
+      ]);
+    });
+
+    it('bulk changes log one row per todo', async () => {
+      const a = await create('A');
+      const b = await create('B');
+      await feed(2);
+      await api()
+        .patch('/api/todos/bulk')
+        .send({ ids: [a.id, b.id], status: 'DONE' })
+        .expect(200);
+      await feed(4);
+      await api()
+        .delete('/api/todos/bulk')
+        .send({ ids: [a.id, b.id] })
+        .expect(204);
+      await feed(6);
+    });
+
+    it('each user only sees their own activity; it needs a token', async () => {
+      await create('Secret');
+      await feed(1);
+      await request(server).get('/api/activity').expect(401);
+      token = await login('bob@test.dev');
+      await api().get('/api/activity').expect(200, []);
+    });
+
+    it('cleanup purges only done todos older than 30 days', async () => {
+      const old = await create('Old done', 'DONE');
+      await create('Recent done', 'DONE');
+      const open = await create('Old open');
+      await app
+        .get(DataSource)
+        .query(
+          `UPDATE todos SET "updatedAt" = now() - interval '31 days' WHERE id = ANY($1)`,
+          [[old.id, open.id]],
+        );
+
+      // The nightly job is really on the clock
+      expect(app.get(SchedulerRegistry).getCronJobs().size).toBe(1);
+      await app.get(CleanupTask).purgeOldDoneTodos();
+
+      const res = await api().get('/api/todos').expect(200);
+      const titles = res.body.map((t: { title: string }) => t.title);
+      expect(titles).toHaveLength(2);
+      expect(titles).not.toContain('Old done');
+    });
+
+    it('signup queues one user.registered message', async () => {
+      emailClient.emit.mockClear(); // beforeEach signed up alice
+      await login('bob@test.dev');
+      expect(emailClient.emit).toHaveBeenCalledTimes(1);
+      expect(emailClient.emit).toHaveBeenCalledWith('user.registered', {
+        messageId: expect.any(String),
+        userId: 2,
+        email: 'bob@test.dev',
+      });
+      // A rejected signup queues nothing
+      await request(server)
+        .post('/api/auth/signup')
+        .send({ email: 'bob@test.dev', password: 'secret123' })
+        .expect(409);
+      expect(emailClient.emit).toHaveBeenCalledTimes(1);
+    });
+
+    it('signup still works when the broker is down', async () => {
+      emailClient.emit.mockReturnValueOnce(
+        throwError(() => new Error('broker down')),
+      );
+      await login('bob@test.dev');
     });
   });
 

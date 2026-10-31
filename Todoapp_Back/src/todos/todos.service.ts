@@ -4,6 +4,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   FindOptionsWhere,
@@ -17,6 +18,7 @@ import { BulkStatusDto } from './dto/bulk.dto.js';
 import { CreateTodoDto } from './dto/create-todo.dto.js';
 import { TodoQueryDto } from './dto/todo-query.dto.js';
 import { UpdateTodoDto } from './dto/update-todo.dto.js';
+import { TodoEvent } from './events/todo.event.js';
 import { MAX_TODOS, Todo } from './todo.entity.js';
 
 // How long a deleted todo can still be brought back with Undo
@@ -32,6 +34,7 @@ export class TodosService {
   constructor(
     @InjectRepository(Todo)
     private readonly repo: Repository<Todo>,
+    private readonly events: EventEmitter2,
   ) {}
 
   // Every query is scoped to the owner in SQL, so nobody sees another user's todos
@@ -72,6 +75,7 @@ export class TodosService {
         ownerId,
       }),
     );
+    this.emit('todo.created', ownerId, saved);
     // Reload so the response has the same fields as every other endpoint
     return this.findOne(ownerId, saved.id);
   }
@@ -82,7 +86,9 @@ export class TodosService {
     if (dto.title !== undefined) todo.title = dto.title;
     if (dto.status !== undefined) todo.status = dto.status;
     if (dto.starred !== undefined) todo.starred = dto.starred;
-    return this.repo.save(todo);
+    const saved = await this.repo.save(todo);
+    this.emit('todo.updated', ownerId, saved);
+    return saved;
   }
 
   // Bonus: PATCH /api/todos/bulk
@@ -91,18 +97,23 @@ export class TodosService {
     { ids, status }: BulkStatusDto,
   ): Promise<Todo[]> {
     await this.repo.update({ id: In(ids), ownerId }, { status });
-    return this.repo.find({
+    const todos = await this.repo.find({
       where: { id: In(ids), ownerId },
       order: { position: 'ASC', id: 'ASC' },
     });
+    for (const todo of todos) this.emit('todo.updated', ownerId, todo);
+    return todos;
   }
 
   async remove(ownerId: number, ids: number[]): Promise<void> {
     await this.purgeExpired();
+    // Read the titles first: the feed needs them after the rows are gone
+    const todos = await this.repo.findBy({ id: In(ids), ownerId });
     const result = await this.repo.softDelete({ id: In(ids), ownerId });
     if (!result.affected)
       throw new NotFoundException('No matching todos found');
     this.logger.log(`Deleted ${result.affected} todo(s)`);
+    for (const todo of todos) this.emit('todo.deleted', ownerId, todo);
   }
 
   // Undo: only todos deleted in the last few minutes can come back.
@@ -141,6 +152,11 @@ export class TodosService {
       [order],
     );
     return this.findAll(ownerId);
+  }
+
+  // Called only after the save has committed, so listeners never see a rolled-back todo
+  private emit(name: string, ownerId: number, todo: Todo) {
+    this.events.emit(name, new TodoEvent(todo.id, ownerId, todo.title));
   }
 
   // Soft-deleted rows older than the Undo window are removed for good

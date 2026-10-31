@@ -2,9 +2,12 @@ import { join } from 'node:path';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import Joi from 'joi';
+import { ActivityModule } from './activity/activity.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { JwtAuthGuard } from './auth/jwt-auth.guard.js';
 import { dbOptions } from './database/db-options.js';
@@ -27,6 +30,7 @@ import { TodosModule } from './todos/todos.module.js';
         DB_PASSWORD: Joi.string(),
         DB_NAME: Joi.string(),
         JWT_SECRET: Joi.string().min(32).required(),
+        RMQ_URL: Joi.string(),
       }),
     }),
     // ConfigModule loads and checks .env first, so this factory sees valid values
@@ -42,9 +46,12 @@ import { TodosModule } from './todos/todos.module.js';
     }),
     // At most 120 requests per minute per client IP
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
+    EventEmitterModule.forRoot(),
+    ScheduleModule.forRoot(),
     TodosModule,
     ProfileModule,
     AuthModule,
+    ActivityModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
