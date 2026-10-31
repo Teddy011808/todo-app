@@ -1,4 +1,4 @@
-# PostgreSQL for the API. Started automatically by `npm run back` (or `npm run db:up`).
+# PostgreSQL and RabbitMQ for the API. Started automatically by `npm run back` (or `npm run db:up`).
 # Values come from .env when it exists, otherwise the defaults after ":-".
 name: todo-app
 
@@ -21,5 +21,23 @@ services:
       timeout: 3s
       retries: 30
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: todo-app-rabbitmq
+    # RabbitMQ stores messages under its hostname, so it must stay the same
+    hostname: rabbitmq
+    ports:
+      # localhost only: the default guest/guest login must not reach your network
+      - '127.0.0.1:5672:5672' # AMQP
+      - '127.0.0.1:15672:15672' # Management UI
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
 volumes:
   pgdata:
+  rabbitmq:

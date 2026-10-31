@@ -1,14 +1,19 @@
 import {
   ConflictException,
+  Inject,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ClientProxy } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
 import argon2 from 'argon2';
 import type { Response } from 'express';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { lastValueFrom, timeout } from 'rxjs';
 import { IsNull, LessThan, QueryFailedError, Repository } from 'typeorm';
+import type { UserRegistered } from '../queue/email.queue.js';
 import { CredentialsDto } from './dto/credentials.dto.js';
 import { RefreshToken } from './refresh-token.entity.js';
 import { User } from './user.entity.js';
@@ -18,6 +23,9 @@ const REFRESH_TTL_MS = 7 * 24 * 3600 * 1000; // 7 days
 // Two tabs reloading at once send the same cookie; the second one inside this
 // window is a normal race, not a stolen token
 const REUSE_GRACE_MS = 10_000;
+
+// Signup answers within this long even if RabbitMQ is down
+const PUBLISH_TIMEOUT_MS = 2_000;
 
 // Unknown emails are checked against this, so they take as long as real ones
 // and response time does not reveal which emails have accounts
@@ -37,11 +45,14 @@ const hashToken = (token: string) =>
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(RefreshToken)
     private readonly refreshTokens: Repository<RefreshToken>,
     private readonly jwt: JwtService,
+    @Inject('EMAIL_SERVICE') private readonly emailClient: ClientProxy,
   ) {}
 
   async signup(dto: CredentialsDto) {
@@ -52,6 +63,7 @@ export class AuthService {
     const passwordHash = await argon2.hash(dto.password);
     try {
       const user = await this.users.save({ email, passwordHash });
+      await this.queueWelcomeEmail(user.id, user.email);
       // Return less: never send the password hash back
       return { id: user.id, email: user.email };
     } catch (err) {
@@ -63,6 +75,25 @@ export class AuthService {
         throw new ConflictException('Email taken');
       }
       throw err;
+    }
+  }
+
+  // The account already exists, so a broker outage must not fail the signup.
+  // shortcut: that welcome email is lost, save an outbox row in the signup transaction if it matters
+  private async queueWelcomeEmail(userId: number, email: string) {
+    const message: UserRegistered = {
+      messageId: randomUUID(),
+      userId,
+      email,
+    };
+    try {
+      await lastValueFrom(
+        this.emailClient
+          .emit('user.registered', message)
+          .pipe(timeout(PUBLISH_TIMEOUT_MS)),
+      );
+    } catch (err) {
+      this.logger.error('welcome email not queued', (err as Error).stack);
     }
   }
 

@@ -5,6 +5,7 @@ import {
   Entity,
   ManyToOne,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { User } from '../auth/user.entity.js';
 
@@ -42,6 +43,10 @@ export class Todo {
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
+
+  // The nightly cleanup measures a done todo's age from this
+  @UpdateDateColumn({ type: 'timestamptz', select: false })
+  updatedAt: Date;
 
   // Soft delete: a deleted row is kept for a few minutes so Undo can restore it
   @DeleteDateColumn({ type: 'timestamptz', select: false })
