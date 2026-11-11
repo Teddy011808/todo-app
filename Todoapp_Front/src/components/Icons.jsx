@@ -92,6 +92,19 @@ export const UserIcon = (props) => (
   </Icon>
 )
 
+export const LogoutIcon = (props) => (
+  <Icon {...props}>
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+  </Icon>
+)
+
+export const LockIcon = (props) => (
+  <Icon {...props}>
+    <rect x="4" y="11" width="16" height="10" rx="2" />
+    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+  </Icon>
+)
+
 export const MailIcon = (props) => (
   <Icon {...props}>
     <rect x="3" y="5" width="18" height="14" rx="2" />

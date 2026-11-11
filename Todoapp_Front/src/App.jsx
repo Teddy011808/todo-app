@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from './api'
 import Header from './components/Header'
+import LoginPage from './components/LoginPage'
 import Hero from './components/Hero'
 import ProfilePage from './components/ProfilePage'
 import TodoForm from './components/TodoForm'
@@ -13,6 +14,8 @@ import './App.css'
 function App() {
   // Data comes from the NestJS backend. Changes show up right away and are
   // saved in the background; if saving fails we reload from the server.
+  // null = still checking the refresh cookie, so the login page does not flash
+  const [loggedIn, setLoggedIn] = useState(null)
   const [user, setUser] = useState(null)
   const [todos, setTodos] = useState([])
   const [loadError, setLoadError] = useState(null)
@@ -36,17 +39,30 @@ function App() {
     [],
   )
 
+  // An expired or missing token sends us back to the login page
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    api.setOnUnauthorized(() => {
+      setLoggedIn(false)
+      setUser(null)
+    })
+  }, [])
+
+  // Page reload: stay logged in if the refresh cookie is still valid
+  useEffect(() => {
+    api.restoreSession().then(setLoggedIn)
+  }, [])
+
+  useEffect(() => {
+    if (loggedIn) loadData()
+  }, [loggedIn, loadData])
 
   // Backend not up yet (e.g. the frontend was started first)? Keep retrying
   // every 2 seconds until the first load works.
   useEffect(() => {
-    if (user || !loadError) return
+    if (!loggedIn || user || !loadError) return
     const timer = setInterval(loadData, 2000)
     return () => clearInterval(timer)
-  }, [user, loadError, loadData])
+  }, [loggedIn, user, loadError, loadData])
 
   // Run a save request; on failure show the error and reload the real data
   const save = useCallback(
@@ -160,6 +176,19 @@ function App() {
     save(api.updateProfile(profile)).then((saved) => saved && setUser(saved))
   }
 
+  // Forget the token and everything loaded with it
+  async function logout() {
+    await api.logout()
+    setLoggedIn(false)
+    setUser(null)
+    setTodos([])
+    setSelectedIds([])
+    setActiveTab('todos')
+  }
+
+  if (loggedIn === null) return null
+  if (!loggedIn) return <LoginPage onLogin={() => setLoggedIn(true)} />
+
   if (!user) {
     return (
       <div className="app">
@@ -187,7 +216,7 @@ function App() {
 
   return (
     <div className="app">
-      <Header user={user} activeTab={activeTab} onTabChange={setActiveTab} todoCount={todos.length} />
+      <Header user={user} activeTab={activeTab} onTabChange={setActiveTab} todoCount={todos.length} onLogout={logout} />
 
       <main className="container">
         {activeTab === 'todos' ? (

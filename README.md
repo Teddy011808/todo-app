@@ -1,6 +1,6 @@
 # Todo App
 
-A full-stack to-do app: a React frontend and a NestJS REST API backed by PostgreSQL.
+A full-stack to-do app: a React frontend and a NestJS REST API backed by PostgreSQL, with a RabbitMQ worker for background emails.
 
 | Folder | What it is |
 |---|---|
@@ -14,10 +14,11 @@ You need **Node.js 20.12+** and **Docker Desktop** (running). Then, in two termi
 ```bash
 cd Todoapp_Front && npm run dev          # React app -> http://localhost:5173
 cd Todoapp_Back  && npm run start:dev    # API       -> http://localhost:3000/api
+cd Todoapp_Back  && npm run worker       # optional: logs welcome emails
 ```
 
 That's it, in either order. Before starting, each command installs its packages automatically
-(npm `predev` / `prestart:dev` scripts). The backend also starts PostgreSQL in Docker (port 5433) and
-creates the tables. The page connects by itself once the API is up.
+(npm `predev` / `prestart:dev` scripts). The backend also starts PostgreSQL (port 5433) and RabbitMQ (port 5672) in
+Docker and creates the tables. The page connects by itself once the API is up.
 
 Run the API tests with `cd Todoapp_Back && npm run test:e2e`.

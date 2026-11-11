@@ -1,7 +1,7 @@
 import type { DataSourceOptions } from 'typeorm';
 
 // Connection settings come from environment variables. The defaults match
-// docker-compose.yml, so the app works without a .env file.
+// compose.yaml, so the app works without a .env file.
 export function dbOptions(): DataSourceOptions {
   return {
     type: 'postgres',

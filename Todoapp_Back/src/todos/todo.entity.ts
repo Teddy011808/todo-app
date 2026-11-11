@@ -3,8 +3,11 @@ import {
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
+  ManyToOne,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
+import { User } from '../auth/user.entity.js';
 
 export const TODO_STATUSES = ['TODO', 'IN_PROGRESS', 'DONE'] as const;
 export type TodoStatus = (typeof TODO_STATUSES)[number];
@@ -31,8 +34,19 @@ export class Todo {
   @Column({ default: 0 })
   position: number;
 
+  // Every to-do has an owner; it comes from the token, never from the body
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  owner?: User;
+
+  @Column({ select: false })
+  ownerId: number;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
+
+  // The nightly cleanup measures a done todo's age from this
+  @UpdateDateColumn({ type: 'timestamptz', select: false })
+  updatedAt: Date;
 
   // Soft delete: a deleted row is kept for a few minutes so Undo can restore it
   @DeleteDateColumn({ type: 'timestamptz', select: false })

@@ -1,5 +1,3 @@
-// Must be first, so every other file sees the .env values
-import './load-env.js';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
 import { setupApp } from './app.setup.js';

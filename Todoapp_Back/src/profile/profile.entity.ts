@@ -1,6 +1,6 @@
 import { Column, Entity, PrimaryColumn } from 'typeorm';
 
-// Single-user app: the profile is always the row with id 1
+// One profile per user: its id is the user's id
 @Entity('profile')
 export class Profile {
   @PrimaryColumn()

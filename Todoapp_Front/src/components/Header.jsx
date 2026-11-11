@@ -1,8 +1,8 @@
 import { getInitials } from '../constants'
-import { CheckIcon, ListIcon, UserIcon } from './Icons'
+import { CheckIcon, ListIcon, LogoutIcon, UserIcon } from './Icons'
 import Tabs from './Tabs'
 
-function Header({ user, activeTab, onTabChange, todoCount }) {
+function Header({ user, activeTab, onTabChange, todoCount, onLogout }) {
   return (
     <header className="topbar">
       <div className="topbar-inner container">
@@ -22,10 +22,15 @@ function Header({ user, activeTab, onTabChange, todoCount }) {
           onChange={onTabChange}
         />
 
-        <button className="user-chip" onClick={() => onTabChange('profile')} title="Open profile">
-          <span className="user-chip-name">{user.displayName || 'Guest'}</span>
-          <span className="avatar">{getInitials(user.displayName)}</span>
-        </button>
+        <div className="topbar-actions">
+          <button className="user-chip" onClick={() => onTabChange('profile')} title="Open profile">
+            <span className="user-chip-name">{user.displayName || 'Guest'}</span>
+            <span className="avatar">{getInitials(user.displayName)}</span>
+          </button>
+          <button className="logout-btn" onClick={onLogout} title="Log out" aria-label="Log out">
+            <LogoutIcon size={18} />
+          </button>
+        </div>
       </div>
     </header>
   )
