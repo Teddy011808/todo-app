@@ -1,0 +1,55 @@
+name: Backend CI and publish
+
+on:
+  push:
+    branches: [main]
+    paths: ['Todoapp_Back/**', '.github/workflows/backend.yml']
+  pull_request:
+    paths: ['Todoapp_Back/**', '.github/workflows/backend.yml']
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Todoapp_Back
+
+    # The e2e tests need a real Postgres; they create their own todo_test database
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 2s --health-retries 30
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: Todoapp_Back/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test:e2e
+
+      # Red tests stop here: nothing below runs, nothing is published
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: github.event_name == 'push'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: Todoapp_Back
+          push: ${{ github.event_name == 'push' }}
+          # GHCR names must be lowercase, so the owner is written out
+          tags: ghcr.io/teddy011808/todo-api:${{ github.sha }}

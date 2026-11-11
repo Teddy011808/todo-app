@@ -1,0 +1,83 @@
+# Whole stack: `docker compose up -d --build` (API on http://localhost:3000).
+# Local dev starts only db + rabbitmq: `npm run db:up` (run by `npm run start:dev`).
+# Values come from .env when it exists, otherwise the defaults after ":-".
+name: todo-app
+
+# Inside the network the API reaches the others by service name, not localhost.
+# These override the localhost values in .env, which are for running the API outside Docker.
+x-in-docker: &in-docker
+  DB_HOST: db
+  DB_PORT: 5432
+  RMQ_URL: amqp://rabbitmq:5672
+
+services:
+  api:
+    build: .
+    image: todo-api:dev
+    ports: ['3000:3000']
+    env_file: [{ path: .env, required: false }]
+    environment:
+      <<: *in-docker
+      # No default: the API must not start with a guessable signing key
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+    depends_on:
+      db: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    restart: unless-stopped
+    # Healthy only once migrations ran and Postgres answers (the slim image has no curl)
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3000/api/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  # Same image, other entry point: reads email_queue
+  worker:
+    build: . # second build is all cache hits
+    image: todo-api:dev
+    command: ['node', 'dist/worker/main.js']
+    env_file: [{ path: .env, required: false }]
+    environment: *in-docker
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+    restart: unless-stopped
+
+  db:
+    image: postgres:16
+    container_name: todo-app-db
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-todo}
+    ports:
+      # 5433 on your machine, so it never clashes with another Postgres on 5432.
+      # localhost only: the default postgres/postgres login must not reach your network
+      - '127.0.0.1:${DB_PORT:-5433}:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: todo-app-rabbitmq
+    # RabbitMQ stores messages under its hostname, so it must stay the same
+    hostname: rabbitmq
+    ports:
+      # localhost only: the default guest/guest login must not reach your network
+      - '127.0.0.1:5672:5672' # AMQP
+      - '127.0.0.1:15672:15672' # Management UI
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
+volumes:
+  pgdata:
+  rabbitmq:

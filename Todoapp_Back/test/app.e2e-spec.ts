@@ -527,6 +527,10 @@ describe('Todo API (e2e)', () => {
     });
   });
 
+  it('GET /api/health is public and checks the database', async () => {
+    await request(server).get('/api/health').expect(200, { status: 'ok' });
+  });
+
   it('rate limits each client', async () => {
     for (let i = 0; i < 120; i++) await api().get('/api/profile');
     await api().get('/api/profile').expect(429);

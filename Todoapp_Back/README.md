@@ -2,14 +2,59 @@
 
 Backend for the React Todo app in `../Todoapp_Front`. All routes start with `/api`.
 
-## Run it
+## Run it with Docker (from a clean clone)
+
+Needs only Docker. Starts the API, the email worker, PostgreSQL and RabbitMQ.
+
+```bash
+git clone https://github.com/Teddy011808/todo-app.git
+cd todo-app/Todoapp_Back
+cp .env.example .env              # then set JWT_SECRET: openssl rand -hex 32
+docker compose up -d --build      # API on http://localhost:3000
+docker compose ps                 # db and rabbitmq show (healthy)
+```
+
+Inside Docker the API reaches the others by service name (`db:5432`, `rabbitmq:5672`). `compose.yaml`
+sets those itself, so the `localhost` values in `.env` are only for running the API outside Docker.
+Migrations run when the API starts. Data lives in the `pgdata` volume: `docker compose down` keeps it,
+`docker compose down -v` deletes it.
+
+Try it:
+
+```bash
+curl -X POST localhost:3000/api/auth/signup -H 'content-type: application/json' \
+  -d '{"email":"me@example.com","password":"secret123"}'
+docker compose logs worker        # shows the welcome email
+```
+
+### CI and the published image
+
+[`.github/workflows/backend.yml`](../.github/workflows/backend.yml) runs lint and the e2e tests on every
+push and pull request. On a push to `main`, once the tests pass, it builds the image and pushes it to
+`ghcr.io/teddy011808/todo-api:<commit-sha>`. A failing test means nothing is published.
+
+### Deploy to a VPS
+
+The server never builds. It pulls the exact image CI tested:
+
+1. Copy `compose.yaml` and a `.env` with real secrets to the server (never into git or the image).
+2. In `compose.yaml`, replace `build: .` and `image: todo-api:dev` with
+   `image: ghcr.io/teddy011808/todo-api:${IMAGE_TAG}` for `api` and `worker`, and remove the
+   published `db` and `rabbitmq` ports so only the API (behind Caddy or Nginx for HTTPS) is public.
+3. Release a version: `export IMAGE_TAG=<commit-sha>`, then `docker compose pull` and `docker compose up -d`.
+4. Check it: `curl -fsS https://<your-domain>/api/health` returns `{"status":"ok"}`; if not, roll back.
+
+Rollback is the same command with the previous SHA. The database schema does not roll back with it,
+so a migration must still work with the previous version of the code.
+
+## Run it for development
 
 ```bash
 npm run start:dev    # API on http://localhost:3000
 ```
 
 Before it starts, `prestart:dev` runs `npm install` and `npm run db:up` (PostgreSQL and RabbitMQ in
-Docker via `docker-compose.yml`, ports 5433 and 5672). Pending migrations run when the API starts.
+Docker via `compose.yaml`, ports 5433 and 5672). Pending migrations run when the API starts.
 
 Welcome emails need the worker, a separate process. In another terminal:
 
@@ -18,7 +63,7 @@ npm run worker       # reads email_queue and logs each welcome email
 ```
 
 Settings (port, database connection, optional `CORS_ORIGIN`) can be overridden in `.env`; see `.env.example`.
-Without a `.env`, the defaults match `docker-compose.yml`.
+Without a `.env`, the defaults match `compose.yaml`.
 
 ## Endpoints
 

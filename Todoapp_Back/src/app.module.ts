@@ -11,6 +11,7 @@ import { ActivityModule } from './activity/activity.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { JwtAuthGuard } from './auth/jwt-auth.guard.js';
 import { dbOptions } from './database/db-options.js';
+import { HealthController } from './health.controller.js';
 import { LoggingExceptionFilter } from './common/logging-exception.filter.js';
 import { ProfileModule } from './profile/profile.module.js';
 import { TodosModule } from './todos/todos.module.js';
@@ -53,6 +54,7 @@ import { TodosModule } from './todos/todos.module.js';
     AuthModule,
     ActivityModule,
   ],
+  controllers: [HealthController],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     // Secure by default: every route needs a token unless it is @Public()
